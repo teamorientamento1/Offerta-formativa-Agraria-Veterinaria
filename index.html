@@ -1,0 +1,324 @@
+<!doctype html>
+<html lang="it">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>Università di Pisa — Offerta Agraria & Veterinaria</title>
+  <meta name="theme-color" content="#04477B" />
+
+  <!-- PDF.js (CDN) -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js" defer></script>
+  <script>
+    document.addEventListener('DOMContentLoaded', () => {
+      const pdfjsVersion = "3.11.174";
+      pdfjsLib.GlobalWorkerOptions.workerSrc =
+        `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsVersion}/pdf.worker.min.js`;
+    });
+  </script>
+
+  <style>
+    :root{ --unipi:#04477B; --bg:#ffffff; --text:#0b1f2a; --muted:#6a7e8c; }
+    *{ box-sizing:border-box; -webkit-tap-highlight-color: transparent; }
+    html,body{ height:100%; }
+    body{ margin:0; background:#f7fafc; color:var(--text);
+      font-family:system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,"Helvetica Neue",Arial,"Noto Sans"; }
+
+    .app{ min-height:100dvh; display:flex; flex-direction:column; }
+
+    /* Viewer */
+    .viewer{ flex:1; display:flex; flex-direction:column; background:#f7fafc; position:relative; overflow:hidden; }
+    .topbar{
+      position:sticky; top:0; z-index:10; background:#fff; border-bottom:1px solid #e7edf3;
+      display:flex; align-items:center; justify-content:space-between; gap:10px; padding:10px 12px;
+    }
+    .title{ display:flex; align-items:center; gap:10px; min-width:0; }
+    .brand{ height:28px; width:auto; object-fit:contain; }
+    .title h2{ font-size:16px; margin:0; font-weight:700; color:var(--unipi); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    .pager{ display:flex; align-items:center; gap:8px; }
+    .pill{ background:#eef4fa; color:var(--unipi); padding:8px 12px; border-radius:999px; font-weight:700; font-size:14px; }
+    .ctrl{ display:flex; gap:6px; }
+    .iconbtn{
+      border:1px solid #dfe8f1; background:#fff; color:var(--unipi);
+      padding:10px 12px; border-radius:12px; font-weight:700; cursor:pointer;
+    }
+    .iconbtn.link{ padding:10px 14px; }
+
+    .pageStage{
+      position:relative; height:calc(100dvh - 62px);
+      touch-action:pan-y pinch-zoom;
+      overflow:hidden; background:#f7fafc;
+    }
+    .pagesTrack{
+      display:flex; height:100%; width:100%; transform:translateX(0);
+      will-change: transform;
+      transition: transform 280ms cubic-bezier(.22,.61,.36,1);
+      align-items:center; gap:16px; padding:0 16px;
+    }
+    .page{ min-width:100%; height:100%; display:flex; align-items:center; justify-content:center; }
+    canvas{
+      box-shadow:0 12px 28px rgba(12,40,68,0.18);
+      background:#fff; border-radius:18px; max-height:92%; width:auto; height:auto;
+      touch-action:none;
+    }
+    .hint{
+      position:absolute; bottom:14px; left:0; right:0; text-align:center; color:#466784; font-size:12px;
+      opacity:.9; user-select:none; pointer-events:none;
+    }
+
+    /* Overlay di caricamento */
+    .loading{
+      position:absolute; inset:0; background:linear-gradient(180deg,#ffffff, #f5f9ff);
+      display:flex; flex-direction:column; align-items:center; justify-content:center; gap:14px;
+    }
+    .loading img{ width:min(300px,70vw); opacity:.9; }
+    .spinner{
+      width:34px; height:34px; border-radius:50%;
+      border:3px solid #d9e6f3; border-top-color:var(--unipi);
+      animation:spin 1s linear infinite;
+    }
+    .loading p{ margin:0; color:#466784; font-weight:600; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+  </style>
+</head>
+<body>
+  <div class="app">
+
+    <!-- VIEWER (aperto subito) -->
+    <section class="viewer" id="viewer" aria-live="polite">
+      <div class="topbar">
+        <div class="title">
+          <img class="brand" src="marchio_unipi_pant541.png" alt="UniPi" />
+          <h2>Offerta formativa — Agraria &amp; Veterinaria</h2>
+        </div>
+        <div class="pager">
+          <span class="pill" id="pageIndicator">— / —</span>
+          <div class="ctrl">
+            <button class="iconbtn" id="prevBtn" aria-label="Pagina precedente">◀</button>
+            <button class="iconbtn" id="nextBtn" aria-label="Pagina successiva">▶</button>
+            <a class="iconbtn link" id="openNative" href="PAGAGRARIA.pdf" target="_blank" rel="noopener">Apri PDF</a>
+          </div>
+        </div>
+      </div>
+
+      <div class="pageStage" id="stage" role="region" aria-label="Pagine documento">
+        <div class="pagesTrack" id="track"></div>
+        <div class="hint">Scorri destra/sinistra · doppio tap per zoom · pizzica per ingrandire</div>
+
+        <!-- Overlay di caricamento -->
+        <div class="loading" id="loading">
+          <img src="marchio_unipi_pant541.png" alt="Università di Pisa" />
+          <div class="spinner" aria-hidden="true"></div>
+          <p>Caricamento documento…</p>
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <script>
+  (function(){
+    const PDF_PATH = 'PAGAGRARIA.pdf';
+    const viewer = document.getElementById('viewer');
+    const prevBtn = document.getElementById('prevBtn');
+    const nextBtn = document.getElementById('nextBtn');
+    const pageIndicator = document.getElementById('pageIndicator');
+    const track = document.getElementById('track');
+    const stage = document.getElementById('stage');
+    const loading = document.getElementById('loading');
+
+    let pdfDoc = null, numPages = 0, currentPage = 1;
+    let trackX = 0, pageWidth = 0;
+
+    const ZOOM_MIN = 1, ZOOM_MAX = 2.4;
+    let zoom = 1, isPinching = false, lastDistance = 0;
+
+    document.addEventListener('DOMContentLoaded', () => {
+      loadPDF(); // parte subito
+    });
+
+    async function loadPDF(){
+      try{
+        pdfDoc = await pdfjsLib.getDocument({ url: PDF_PATH }).promise;
+        numPages = pdfDoc.numPages;
+        pageIndicator.textContent = `1 / ${numPages}`;
+
+        for(let i=1;i<=numPages;i++){
+          const pageDiv = document.createElement('div');
+          pageDiv.className = 'page';
+          const canvas = document.createElement('canvas');
+          canvas.setAttribute('data-page', i);
+          pageDiv.appendChild(canvas);
+          track.appendChild(pageDiv);
+        }
+
+        await ensureRendered(currentPage);
+        await ensureRendered(currentPage+1);
+        await ensureRendered(currentPage-1);
+
+        loading.style.display = 'none';
+        requestAnimationFrame(updateSizes);
+        bindGestures();
+      }catch(err){
+        loading.querySelector('p').textContent = 'Errore nel caricamento del PDF';
+        console.error(err);
+      }
+    }
+
+    function updateSizes(){
+      const stageRect = stage.getBoundingClientRect();
+      pageWidth = stageRect.width;
+      track.style.transform = `translateX(${ - (currentPage-1) * pageWidth }px)`;
+      trackX = - (currentPage-1) * pageWidth;
+      [currentPage-1, currentPage, currentPage+1].forEach(p => {
+        if(p>=1 && p<=numPages) renderPage(p, true);
+      });
+    }
+    window.addEventListener('resize', updateSizes, {passive:true});
+
+    async function renderPage(p, force=false){
+      const canvas = track.querySelector(`canvas[data-page="${p}"]`);
+      if(!canvas) return;
+      if(canvas._rendering && !force) return;
+      canvas._rendering = true;
+
+      const ctx = canvas.getContext('2d');
+      const page = await pdfDoc.getPage(p);
+
+      const stageRect = stage.getBoundingClientRect();
+      const viewportBase = page.getViewport({ scale: 1 });
+      const scaleByHeight = (stageRect.height * 0.92) / viewportBase.height;
+      const scale = Math.max(1, scaleByHeight) * zoom;
+      const viewport = page.getViewport({ scale });
+
+      canvas.width = Math.floor(viewport.width);
+      canvas.height = Math.floor(viewport.height);
+
+      await page.render({ canvasContext: ctx, viewport }).promise;
+      canvas._rendering = false;
+    }
+
+    async function ensureRendered(p){
+      if(p<1 || p>numPages) return;
+      const canvas = track.querySelector(`canvas[data-page="${p}"]`);
+      if(canvas && !canvas._renderedOnce){
+        await renderPage(p, true);
+        canvas._renderedOnce = true;
+      }
+    }
+
+    function goTo(page, animate=true){
+      if(page<1) page=1;
+      if(page>numPages) page=numPages;
+      currentPage = page;
+      pageIndicator.textContent = `${currentPage} / ${numPages}`;
+      zoom = 1;
+      track.style.transition = animate ? 'transform 280ms cubic-bezier(.22,.61,.36,1)' : 'none';
+      trackX = - (currentPage-1) * pageWidth;
+      track.style.transform = `translateX(${trackX}px)`;
+      ensureRendered(currentPage);
+      ensureRendered(currentPage+1);
+      ensureRendered(currentPage-1);
+      renderPage(currentPage, true);
+    }
+
+    prevBtn.addEventListener('click', () => goTo(currentPage-1));
+    nextBtn.addEventListener('click', () => goTo(currentPage+1));
+
+    function bindGestures(){
+      let startX=0, startY=0, dragging=false;
+
+      stage.addEventListener('touchstart', (e) => {
+        if(e.touches.length===1){
+          dragging=true; startX = e.touches[0].clientX; startY = e.touches[0].clientY; track.style.transition = 'none';
+        }else if(e.touches.length===2){
+          isPinching = true; lastDistance = distance(e.touches[0], e.touches[1]);
+        }
+      }, {passive:true});
+
+      stage.addEventListener('touchmove', (e) => {
+        if(isPinching && e.touches.length===2){
+          const d = distance(e.touches[0], e.touches[1]);
+          const factor = d / (lastDistance || d);
+          lastDistance = d;
+          const prevZoom = zoom;
+          zoom = clamp(zoom * factor, ZOOM_MIN, ZOOM_MAX);
+          if(Math.abs(zoom - prevZoom) > 0.01) renderPage(currentPage, true);
+          return;
+        }
+        if(!dragging || e.touches.length!==1) return;
+        const dx = e.touches[0].clientX - startX;
+        const dy = e.touches[0].clientY - startY;
+        if(Math.abs(dy) > Math.abs(dx) * 1.2) return;
+        const targetX = - (currentPage-1) * pageWidth + dx;
+        track.style.transform = `translateX(${targetX}px)`;
+      }, {passive:true});
+
+      stage.addEventListener('touchend', (e) => {
+        if(isPinching && e.touches.length<2){ isPinching = false; return; }
+        if(!dragging) return; dragging = false;
+        const endX = (e.changedTouches && e.changedTouches[0]) ? e.changedTouches[0].clientX : startX;
+        const delta = endX - startX;
+        if(Math.abs(delta) > pageWidth * 0.18){
+          if(delta < 0) goTo(currentPage+1); else goTo(currentPage-1);
+        }else{
+          goTo(currentPage, true);
+        }
+      }, {passive:true});
+
+      // double tap
+      let lastTap = 0;
+      stage.addEventListener('touchend', (e) => {
+        const now = Date.now();
+        if(now - lastTap < 260 && !isPinching){
+          zoom = (zoom>1.05) ? 1 : 1.8;
+          renderPage(currentPage, true);
+        }
+        lastTap = now;
+      }, {passive:true});
+
+      // mouse drag
+      let mDown=false, mStart=0;
+      stage.addEventListener('mousedown', (e)=>{ mDown = true; mStart = e.clientX; track.style.transition='none'; });
+      window.addEventListener('mousemove', (e)=>{
+        if(!mDown) return;
+        const dx = e.clientX - mStart;
+        const targetX = - (currentPage-1) * pageWidth + dx;
+        track.style.transform = `translateX(${targetX}px)`;
+      });
+      window.addEventListener('mouseup', (e)=>{
+        if(!mDown) return; mDown=false;
+        const delta = e.clientX - mStart;
+        if(Math.abs(delta) > pageWidth*0.18){
+          if(delta<0) goTo(currentPage+1); else goTo(currentPage-1);
+        } else {
+          goTo(currentPage,true);
+        }
+      });
+
+      // wheel (orizzontale) e zoom con Ctrl+rotella
+      stage.addEventListener('wheel', (e)=>{
+        if(Math.abs(e.deltaX) > Math.abs(e.deltaY)){
+          if(e.deltaX>0) goTo(currentPage+1); else goTo(currentPage-1);
+        } else if (e.ctrlKey){
+          e.preventDefault();
+          const factor = (e.deltaY>0) ? 0.9 : 1.1;
+          zoom = clamp(zoom * factor, ZOOM_MIN, ZOOM_MAX);
+          renderPage(currentPage, true);
+        }
+      }, {passive:false});
+    }
+
+    function clamp(v, min, max){ return Math.max(min, Math.min(max, v)); }
+    function distance(a,b){ const dx = a.clientX - b.clientX, dy = a.clientY - b.clientY; return Math.hypot(dx, dy); }
+
+    // Tastiera
+    document.addEventListener('keydown', (e)=>{
+      if(e.key === 'ArrowRight') nextBtn.click();
+      if(e.key === 'ArrowLeft')  prevBtn.click();
+      if(e.key === '+'){ zoom = clamp(zoom*1.1, ZOOM_MIN, ZOOM_MAX); renderPage(currentPage,true); }
+      if(e.key === '-'){ zoom = clamp(zoom*0.9, ZOOM_MIN, ZOOM_MAX); renderPage(currentPage,true); }
+    });
+  })();
+  </script>
+</body>
+</html>
