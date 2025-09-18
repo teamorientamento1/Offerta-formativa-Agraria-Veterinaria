@@ -6,155 +6,171 @@
   <title>Università di Pisa — Offerta Agraria & Veterinaria</title>
   <meta name="theme-color" content="#04477B" />
 
-  <!-- PDF.js (CDN) -->
+  <!-- PDF.js -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js" defer></script>
   <script>
     document.addEventListener('DOMContentLoaded', () => {
-      const pdfjsVersion = "3.11.174";
+      const v = "3.11.174";
       pdfjsLib.GlobalWorkerOptions.workerSrc =
-        `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsVersion}/pdf.worker.min.js`;
+        `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${v}/pdf.worker.min.js`;
     });
   </script>
 
   <style>
-    :root{ --unipi:#04477B; --bg:#ffffff; --text:#0b1f2a; --muted:#6a7e8c; }
+    :root{ --unipi:#04477B; --bg:#ffffff; --text:#0b1f2a; --muted:#5c7080; }
     *{ box-sizing:border-box; -webkit-tap-highlight-color: transparent; }
     html,body{ height:100%; }
-    body{ margin:0; background:#f7fafc; color:var(--text);
+    body{ margin:0; background:#f6f9fc; color:var(--text);
       font-family:system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,"Helvetica Neue",Arial,"Noto Sans"; }
-
     .app{ min-height:100dvh; display:flex; flex-direction:column; }
 
-    /* Viewer */
-    .viewer{ flex:1; display:flex; flex-direction:column; background:#f7fafc; position:relative; overflow:hidden; }
+    /* Topbar */
     .topbar{
       position:sticky; top:0; z-index:10; background:#fff; border-bottom:1px solid #e7edf3;
       display:flex; align-items:center; justify-content:space-between; gap:10px; padding:10px 12px;
     }
     .title{ display:flex; align-items:center; gap:10px; min-width:0; }
     .brand{ height:28px; width:auto; object-fit:contain; }
-    .title h2{ font-size:16px; margin:0; font-weight:700; color:var(--unipi); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-    .pager{ display:flex; align-items:center; gap:8px; }
-    .pill{ background:#eef4fa; color:var(--unipi); padding:8px 12px; border-radius:999px; font-weight:700; font-size:14px; }
-    .ctrl{ display:flex; gap:6px; }
+    .title h2{
+      margin:0; font-weight:800; color:var(--unipi);
+      font-size:clamp(14px, 4.5vw, 18px);
+      line-height:1.15;
+      white-space:normal; /* consenti a capo su mobile */
+    }
+    .right{
+      display:flex; align-items:center; gap:8px; flex-shrink:0;
+    }
+    .pill{ background:#eef4fa; color:var(--unipi); padding:8px 12px; border-radius:999px; font-weight:700; font-size:13px; }
     .iconbtn{
       border:1px solid #dfe8f1; background:#fff; color:var(--unipi);
       padding:10px 12px; border-radius:12px; font-weight:700; cursor:pointer;
     }
-    .iconbtn.link{ padding:10px 14px; }
+    .iconbtn.link{ text-decoration:none; display:inline-block; }
 
+    /* Stage + Track */
     .pageStage{
       position:relative; height:calc(100dvh - 62px);
-      touch-action:pan-y pinch-zoom;
-      overflow:hidden; background:#f7fafc;
+      touch-action:pan-y pinch-zoom; overflow:hidden; background:#f6f9fc;
     }
     .pagesTrack{
       display:flex; height:100%; width:100%; transform:translateX(0);
-      will-change: transform;
-      transition: transform 280ms cubic-bezier(.22,.61,.36,1);
+      will-change: transform; transition: transform 280ms cubic-bezier(.22,.61,.36,1);
       align-items:center; gap:16px; padding:0 16px;
     }
     .page{ min-width:100%; height:100%; display:flex; align-items:center; justify-content:center; }
     canvas{
       box-shadow:0 12px 28px rgba(12,40,68,0.18);
-      background:#fff; border-radius:18px; max-height:92%; width:auto; height:auto;
-      touch-action:none;
-    }
-    .hint{
-      position:absolute; bottom:14px; left:0; right:0; text-align:center; color:#466784; font-size:12px;
-      opacity:.9; user-select:none; pointer-events:none;
+      background:#fff; border-radius:18px; max-height:92%; max-width:94%;
+      width:auto; height:auto; touch-action:none;
     }
 
-    /* Overlay di caricamento */
+    /* Cover (pagina 1 fissa) */
+    .cover{
+      width:min(920px, 92vw);
+      border:1px solid #e9eef2; border-radius:28px; padding:32px 28px;
+      box-shadow:0 10px 30px rgba(4,71,123,0.10);
+      background:#fff; text-align:center;
+      display:grid; gap:16px;
+    }
+    .cover img{ width:min(540px, 80vw); height:auto; justify-self:center; }
+    .cover h1{ margin:4px 0 0; color:var(--unipi); letter-spacing:.2px; font-size:clamp(20px, 5.6vw, 34px); }
+    .cover p{ margin:0; color:var(--muted); font-size:clamp(14px, 3.6vw, 16px); }
+    .cover .hintCover{ color:#466784; font-size:12px; margin-top:8px; }
+
+    /* Loading overlay */
     .loading{
       position:absolute; inset:0; background:linear-gradient(180deg,#ffffff, #f5f9ff);
       display:flex; flex-direction:column; align-items:center; justify-content:center; gap:14px;
     }
     .loading img{ width:min(300px,70vw); opacity:.9; }
-    .spinner{
-      width:34px; height:34px; border-radius:50%;
-      border:3px solid #d9e6f3; border-top-color:var(--unipi);
-      animation:spin 1s linear infinite;
-    }
+    .spinner{ width:34px; height:34px; border-radius:50%; border:3px solid #d9e6f3; border-top-color:var(--unipi); animation:spin 1s linear infinite; }
     .loading p{ margin:0; color:#466784; font-weight:600; }
     @keyframes spin { to { transform: rotate(360deg); } }
-
   </style>
 </head>
 <body>
   <div class="app">
+    <div class="topbar">
+      <div class="title">
+        <img class="brand" src="marchio_unipi_pant541.png" alt="UniPi" />
+        <h2>Offerta formativa — Agraria &amp; Veterinaria</h2>
+      </div>
+      <div class="right">
+        <span class="pill" id="pageIndicator">— / —</span>
+        <button class="iconbtn" id="prevBtn" aria-label="Pagina precedente">◀</button>
+        <button class="iconbtn" id="nextBtn" aria-label="Pagina successiva">▶</button>
+        <!-- Scarica PDF -->
+        <a class="iconbtn link" href="PAGAGRARIA.pdf" download>Scarica PDF</a>
+      </div>
+    </div>
 
-    <!-- VIEWER (aperto subito) -->
-    <section class="viewer" id="viewer" aria-live="polite">
-      <div class="topbar">
-        <div class="title">
-          <img class="brand" src="marchio_unipi_pant541.png" alt="UniPi" />
-          <h2>Offerta formativa — Agraria &amp; Veterinaria</h2>
-        </div>
-        <div class="pager">
-          <span class="pill" id="pageIndicator">— / —</span>
-          <div class="ctrl">
-            <button class="iconbtn" id="prevBtn" aria-label="Pagina precedente">◀</button>
-            <button class="iconbtn" id="nextBtn" aria-label="Pagina successiva">▶</button>
-            <a class="iconbtn link" id="openNative" href="PAGAGRARIA.pdf" target="_blank" rel="noopener">Apri PDF</a>
+    <div class="pageStage" id="stage" role="region" aria-label="Pagine documento">
+      <div class="pagesTrack" id="track">
+        <!-- Pagina 1: COVER fissa -->
+        <div class="page">
+          <div class="cover" id="cover">
+            <img src="marchio_unipi_pant541.png" alt="Università di Pisa" />
+            <h1>Università di Pisa</h1>
+            <p>Offerta formativa — Dipartimenti di Agraria e di Scienze Veterinarie</p>
+            <p class="hintCover">Suggerimento: scorri a destra per sfogliare il documento</p>
           </div>
         </div>
+        <!-- Le pagine del PDF verranno aggiunte qui via JS -->
       </div>
 
-      <div class="pageStage" id="stage" role="region" aria-label="Pagine documento">
-        <div class="pagesTrack" id="track"></div>
-        <div class="hint">Scorri destra/sinistra · doppio tap per zoom · pizzica per ingrandire</div>
-
-        <!-- Overlay di caricamento -->
-        <div class="loading" id="loading">
-          <img src="marchio_unipi_pant541.png" alt="Università di Pisa" />
-          <div class="spinner" aria-hidden="true"></div>
-          <p>Caricamento documento…</p>
-        </div>
+      <!-- Overlay di caricamento -->
+      <div class="loading" id="loading">
+        <img src="marchio_unipi_pant541.png" alt="UniPi" />
+        <div class="spinner" aria-hidden="true"></div>
+        <p>Caricamento documento…</p>
       </div>
-    </section>
+    </div>
   </div>
 
   <script>
   (function(){
     const PDF_PATH = 'PAGAGRARIA.pdf';
-    const viewer = document.getElementById('viewer');
+    const stage = document.getElementById('stage');
+    const track = document.getElementById('track');
+    const loading = document.getElementById('loading');
     const prevBtn = document.getElementById('prevBtn');
     const nextBtn = document.getElementById('nextBtn');
     const pageIndicator = document.getElementById('pageIndicator');
-    const track = document.getElementById('track');
-    const stage = document.getElementById('stage');
-    const loading = document.getElementById('loading');
 
-    let pdfDoc = null, numPages = 0, currentPage = 1;
-    let trackX = 0, pageWidth = 0;
+    // Nota: page 1 = COVER. Le pagine PDF partono da page 2.
+    let pdfDoc = null, pdfPages = 0;
+    let totalPages = 1; // cover
+    let currentPage = 1;
+    let pageWidth = 0;
 
+    // Zoom
     const ZOOM_MIN = 1, ZOOM_MAX = 2.4;
     let zoom = 1, isPinching = false, lastDistance = 0;
 
     document.addEventListener('DOMContentLoaded', () => {
-      loadPDF(); // parte subito
+      loadPDF(); // carica subito
     });
 
     async function loadPDF(){
       try{
         pdfDoc = await pdfjsLib.getDocument({ url: PDF_PATH }).promise;
-        numPages = pdfDoc.numPages;
-        pageIndicator.textContent = `1 / ${numPages}`;
+        pdfPages = pdfDoc.numPages;
+        totalPages = 1 + pdfPages; // cover + pdf
+        pageIndicator.textContent = `${currentPage} / ${totalPages}`;
 
-        for(let i=1;i<=numPages;i++){
+        // Crea i contenitori per le pagine PDF (dalla 2 alla totalPages)
+        for(let i=1;i<=pdfPages;i++){
           const pageDiv = document.createElement('div');
           pageDiv.className = 'page';
           const canvas = document.createElement('canvas');
-          canvas.setAttribute('data-page', i);
+          canvas.setAttribute('data-pdf-page', i); // indice delle pagine PDF
           pageDiv.appendChild(canvas);
           track.appendChild(pageDiv);
         }
 
-        await ensureRendered(currentPage);
-        await ensureRendered(currentPage+1);
-        await ensureRendered(currentPage-1);
-
+        // Render iniziale
+        await ensureRenderedPDF(1); // prima pagina del PDF (che corrisponde alla pagina "2" totale)
+        await ensureRenderedPDF(2);
         loading.style.display = 'none';
         requestAnimationFrame(updateSizes);
         bindGestures();
@@ -167,71 +183,93 @@
     function updateSizes(){
       const stageRect = stage.getBoundingClientRect();
       pageWidth = stageRect.width;
+
+      // riposiziona track sulla pagina corrente
       track.style.transform = `translateX(${ - (currentPage-1) * pageWidth }px)`;
-      trackX = - (currentPage-1) * pageWidth;
-      [currentPage-1, currentPage, currentPage+1].forEach(p => {
-        if(p>=1 && p<=numPages) renderPage(p, true);
-      });
+
+      // ridisegna la pagina corrente (se è PDF)
+      if(currentPage >= 2){
+        const pdfIndex = currentPage - 1; // 1-based nel PDF
+        renderPDFPage(pdfIndex, true);
+        ensureRenderedPDF(pdfIndex+1);
+        ensureRenderedPDF(pdfIndex-1);
+      }
     }
     window.addEventListener('resize', updateSizes, {passive:true});
 
-    async function renderPage(p, force=false){
-      const canvas = track.querySelector(`canvas[data-page="${p}"]`);
+    // Rendering PDF che si adatta sia in altezza che in larghezza + pixelRatio per nitidezza
+    async function renderPDFPage(pdfIndex, force=false){
+      const canvas = track.querySelector(`canvas[data-pdf-page="${pdfIndex}"]`);
       if(!canvas) return;
       if(canvas._rendering && !force) return;
       canvas._rendering = true;
 
-      const ctx = canvas.getContext('2d');
-      const page = await pdfDoc.getPage(p);
-
+      const page = await pdfDoc.getPage(pdfIndex);
       const stageRect = stage.getBoundingClientRect();
-      const viewportBase = page.getViewport({ scale: 1 });
-      const scaleByHeight = (stageRect.height * 0.92) / viewportBase.height;
-      const scale = Math.max(1, scaleByHeight) * zoom;
-      const viewport = page.getViewport({ scale });
+      const base = page.getViewport({ scale: 1 });
+
+      // Fit-to-screen: scegli il min tra scala per altezza e per larghezza
+      const scaleH = (stageRect.height * 0.92) / base.height;
+      const scaleW = (stageRect.width  * 0.94) / base.width;
+      const scale = Math.max(1, Math.min(scaleH, scaleW)) * zoom;
+
+      // Nitidezza su display ad alta densità
+      const ratio = window.devicePixelRatio || 1;
+      const viewport = page.getViewport({ scale: scale * ratio });
 
       canvas.width = Math.floor(viewport.width);
       canvas.height = Math.floor(viewport.height);
+      canvas.style.width = Math.floor(viewport.width / ratio) + "px";
+      canvas.style.height = Math.floor(viewport.height / ratio) + "px";
 
+      const ctx = canvas.getContext('2d');
       await page.render({ canvasContext: ctx, viewport }).promise;
+
       canvas._rendering = false;
+      canvas._renderedOnce = true;
     }
 
-    async function ensureRendered(p){
-      if(p<1 || p>numPages) return;
-      const canvas = track.querySelector(`canvas[data-page="${p}"]`);
+    async function ensureRenderedPDF(pdfIndex){
+      if(pdfIndex < 1 || pdfIndex > pdfPages) return;
+      const canvas = track.querySelector(`canvas[data-pdf-page="${pdfIndex}"]`);
       if(canvas && !canvas._renderedOnce){
-        await renderPage(p, true);
-        canvas._renderedOnce = true;
+        await renderPDFPage(pdfIndex, true);
       }
     }
 
     function goTo(page, animate=true){
       if(page<1) page=1;
-      if(page>numPages) page=numPages;
+      if(page>totalPages) page=totalPages;
       currentPage = page;
-      pageIndicator.textContent = `${currentPage} / ${numPages}`;
+      pageIndicator.textContent = `${currentPage} / ${totalPages}`;
       zoom = 1;
+
       track.style.transition = animate ? 'transform 280ms cubic-bezier(.22,.61,.36,1)' : 'none';
-      trackX = - (currentPage-1) * pageWidth;
-      track.style.transform = `translateX(${trackX}px)`;
-      ensureRendered(currentPage);
-      ensureRendered(currentPage+1);
-      ensureRendered(currentPage-1);
-      renderPage(currentPage, true);
+      track.style.transform = `translateX(${ - (currentPage-1) * pageWidth }px)`;
+
+      if(currentPage >= 2){
+        const pdfIndex = currentPage - 1;
+        ensureRenderedPDF(pdfIndex);
+        ensureRenderedPDF(pdfIndex+1);
+        ensureRenderedPDF(pdfIndex-1);
+        renderPDFPage(pdfIndex, true);
+      }
     }
 
+    // Controlli
     prevBtn.addEventListener('click', () => goTo(currentPage-1));
     nextBtn.addEventListener('click', () => goTo(currentPage+1));
 
+    // Gesture: swipe + pinch zoom + doppio tap
     function bindGestures(){
       let startX=0, startY=0, dragging=false;
 
       stage.addEventListener('touchstart', (e) => {
         if(e.touches.length===1){
-          dragging=true; startX = e.touches[0].clientX; startY = e.touches[0].clientY; track.style.transition = 'none';
-        }else if(e.touches.length===2){
-          isPinching = true; lastDistance = distance(e.touches[0], e.touches[1]);
+          dragging=true; startX=e.touches[0].clientX; startY=e.touches[0].clientY;
+          track.style.transition='none';
+        } else if(e.touches.length===2){
+          isPinching=true; lastDistance=distance(e.touches[0], e.touches[1]);
         }
       }, {passive:true});
 
@@ -242,7 +280,9 @@
           lastDistance = d;
           const prevZoom = zoom;
           zoom = clamp(zoom * factor, ZOOM_MIN, ZOOM_MAX);
-          if(Math.abs(zoom - prevZoom) > 0.01) renderPage(currentPage, true);
+          if(currentPage>=2 && Math.abs(zoom - prevZoom) > 0.01){
+            renderPDFPage(currentPage-1, true);
+          }
           return;
         }
         if(!dragging || e.touches.length!==1) return;
@@ -254,31 +294,31 @@
       }, {passive:true});
 
       stage.addEventListener('touchend', (e) => {
-        if(isPinching && e.touches.length<2){ isPinching = false; return; }
-        if(!dragging) return; dragging = false;
+        if(isPinching && e.touches.length<2){ isPinching=false; return; }
+        if(!dragging) return; dragging=false;
         const endX = (e.changedTouches && e.changedTouches[0]) ? e.changedTouches[0].clientX : startX;
         const delta = endX - startX;
         if(Math.abs(delta) > pageWidth * 0.18){
           if(delta < 0) goTo(currentPage+1); else goTo(currentPage-1);
-        }else{
+        } else {
           goTo(currentPage, true);
         }
       }, {passive:true});
 
-      // double tap
+      // doppio tap per zoom
       let lastTap = 0;
       stage.addEventListener('touchend', (e) => {
         const now = Date.now();
-        if(now - lastTap < 260 && !isPinching){
+        if(now - lastTap < 260 && !isPinching && currentPage>=2){
           zoom = (zoom>1.05) ? 1 : 1.8;
-          renderPage(currentPage, true);
+          renderPDFPage(currentPage-1, true);
         }
         lastTap = now;
       }, {passive:true});
 
-      // mouse drag
+      // Desktop drag
       let mDown=false, mStart=0;
-      stage.addEventListener('mousedown', (e)=>{ mDown = true; mStart = e.clientX; track.style.transition='none'; });
+      stage.addEventListener('mousedown', (e)=>{ mDown=true; mStart=e.clientX; track.style.transition='none'; });
       window.addEventListener('mousemove', (e)=>{
         if(!mDown) return;
         const dx = e.clientX - mStart;
@@ -295,29 +335,29 @@
         }
       });
 
-      // wheel (orizzontale) e zoom con Ctrl+rotella
+      // Wheel orizzontale / Zoom con Ctrl+rotella
       stage.addEventListener('wheel', (e)=>{
         if(Math.abs(e.deltaX) > Math.abs(e.deltaY)){
           if(e.deltaX>0) goTo(currentPage+1); else goTo(currentPage-1);
-        } else if (e.ctrlKey){
+        } else if (e.ctrlKey && currentPage>=2){
           e.preventDefault();
           const factor = (e.deltaY>0) ? 0.9 : 1.1;
           zoom = clamp(zoom * factor, ZOOM_MIN, ZOOM_MAX);
-          renderPage(currentPage, true);
+          renderPDFPage(currentPage-1, true);
         }
       }, {passive:false});
+
+      // Tastiera
+      document.addEventListener('keydown', (e)=>{
+        if(e.key === 'ArrowRight') goTo(currentPage+1);
+        if(e.key === 'ArrowLeft')  goTo(currentPage-1);
+        if((e.key === '+' || e.key === '=') && currentPage>=2){ zoom = clamp(zoom*1.1, ZOOM_MIN, ZOOM_MAX); renderPDFPage(currentPage-1,true); }
+        if(e.key === '-' && currentPage>=2){ zoom = clamp(zoom*0.9, ZOOM_MIN, ZOOM_MAX); renderPDFPage(currentPage-1,true); }
+      });
     }
 
     function clamp(v, min, max){ return Math.max(min, Math.min(max, v)); }
-    function distance(a,b){ const dx = a.clientX - b.clientX, dy = a.clientY - b.clientY; return Math.hypot(dx, dy); }
-
-    // Tastiera
-    document.addEventListener('keydown', (e)=>{
-      if(e.key === 'ArrowRight') nextBtn.click();
-      if(e.key === 'ArrowLeft')  prevBtn.click();
-      if(e.key === '+'){ zoom = clamp(zoom*1.1, ZOOM_MIN, ZOOM_MAX); renderPage(currentPage,true); }
-      if(e.key === '-'){ zoom = clamp(zoom*0.9, ZOOM_MIN, ZOOM_MAX); renderPage(currentPage,true); }
-    });
+    function distance(a,b){ const dx=a.clientX-b.clientX, dy=a.clientY-b.clientY; return Math.hypot(dx,dy); }
   })();
   </script>
 </body>
